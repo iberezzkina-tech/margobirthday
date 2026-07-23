@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Лаборатория Регул-9 — Дневник аномальных образцов</title>
+    <style>
+        :root {
+            --neon-purple: #b44dff; --neon-blue: #4dc9f6; --neon-cyan: #00e5ff;
+            --dark-bg: #0a0a12; --panel-bg: rgba(16, 16, 30, 0.92); --golden: #ffd740;
+            --error: #ff5252; --success: #69f0ae; --text: #e0e0f0; --text-dim: #9c9cc7;
+            --font-mono: 'Courier New', 'Consolas', monospace;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            position: fixed; top: 0; left: 0;
+        }
+        body {
+            font-family:var(--font-mono); background:var(--dark-bg);
+            user-select:none; -webkit-user-select:none;
+            -webkit-tap-highlight-color:transparent; cursor:crosshair;
+            font-size: 1.5rem;
+        }
+        #title-screen {
+            position:fixed; inset:0; z-index:1000;
+            background:radial-gradient(ellipse at center, #12102a 0%, #06060f 100%);
+            display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2rem;
+            transition:opacity 0.8s ease, visibility 0.8s ease;
+        }
+        #title-screen.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+        #title-screen .logo-icon { font-size:5rem; filter:drop-shadow(0 0 30px var(--neon-purple)); animation:float-icon 3s ease-in-out infinite; }
+        @keyframes float-icon { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-18px);} }
+        #title-screen h1 { font-size:clamp(1.4rem,3vw,2.2rem); color:var(--neon-cyan); text-align:center; text-shadow:0 0 20px rgba(0,229,255,0.7); letter-spacing:0.08em; line-height:1.4; }
+        #title-screen h1 span { display:block; font-size:0.7em; color:var(--neon-purple); text-shadow:0 0 15px rgba(180,77,255,0.7); }
+        #title-screen .btn-start { font-family:var(--font-mono); padding:1rem 2.5rem; background:transparent; color:var(--neon-cyan); border:2px solid var(--neon-cyan); border-radius:50px; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase; transition:all 0.35s ease; box-shadow:0 0 20px rgba(0,229,255,0.25); }
+        #title-screen .btn-start:hover { background:rgba(0,229,255,0.12); box-shadow:0 0 40px rgba(0,229,255,0.5); transform:scale(1.04); }
+        .hint-about { font-size: 0.9rem; color: var(--text-dim); margin-top: -1rem; text-align: center; }
+        .age-warning { border:1px solid var(--error); padding:0.2rem 0.8rem; border-radius:20px; text-shadow:0 0 10px rgba(179, 148, 148, 0.7); letter-spacing:0.1em; color: var(--text-dim); }
+        #lab-scene {
+            position:fixed; inset:0;
+            background-image:url('lab-bg.png'); background-size:cover;
+            background-position:center; background-repeat:no-repeat;
+            z-index:1; background-color:#0a0c18;
+            width: 100vw; height: 100vh; height: 100dvh;
+        }
+        #lab-scene::before { content:''; position:absolute; inset:0; background:linear-gradient(rgba(180,77,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(180,77,255,0.04) 1px, transparent 1px); background-size:40px 40px; pointer-events:none; z-index:0; }
+        #margo { position:absolute; width:clamp(80px,10vw,128px); height:auto; z-index:10; transition:left 0.6s cubic-bezier(0.25,0.1,0.25,1), top 0.6s cubic-bezier(0.25,0.1,0.25,1); filter:drop-shadow(0 0 8px rgba(180,77,255,0.5)); pointer-events:auto; cursor:pointer; }
+        #margo img { width:100%; height:auto; display:block; }
+        #margo.walking img { animation: walk 0.4s ease-in-out infinite; }
+        @keyframes walk { 0%,100%{transform:rotate(0deg) translateY(0);} 25%{transform:rotate(2deg) translateY(-4px);} 75%{transform:rotate(-2deg) translateY(-4px);} }
+        #speech-bubble { position:absolute; z-index:20; pointer-events:none; background:var(--panel-bg); border:1px solid var(--neon-cyan); border-radius:12px; padding:0.5rem 0.8rem; max-width:200px; color:var(--text); white-space:normal; text-align:center; box-shadow:0 0 15px rgba(0,229,255,0.4); opacity:0; transition:opacity 0.25s ease; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); }
+        #speech-bubble.show { opacity:1; }
+        .device { position:absolute; z-index:5; cursor:pointer; transition:filter 0.3s ease, transform 0.3s ease; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:auto; }
+        .device img { width:100%; height:auto; display:block; pointer-events:none; }
+        .device .dev-label { color:var(--text-dim); text-align:center; text-shadow:0 0 6px rgba(0,0,0,0.8); background:rgba(0,0,0,0.55); padding:2px 8px; border-radius:10px; white-space:nowrap; font-size:0.9rem; }
+        .device:hover { filter:drop-shadow(0 0 18px var(--neon-purple)) brightness(1.2); transform:translateY(-2px); z-index:12; }
+        .device.highlight { filter:drop-shadow(0 0 25px var(--neon-cyan)) brightness(1.3); animation:pulse-glow 1s ease-in-out infinite; }
+        @keyframes pulse-glow { 0%,100%{filter:drop-shadow(0 0 20px var(--neon-cyan)) brightness(1.2);} 50%{filter:drop-shadow(0 0 40px var(--neon-cyan)) brightness(1.5);} }
+        #sample-table { cursor:pointer; z-index:6; }
+        #sample-table .sample-img { position:absolute; top:-35%; left:50%; transform:translateX(-50%); object-fit:contain; filter:drop-shadow(0 0 10px rgba(255,215,64,0.6)); pointer-events:auto; cursor:help; transition: transform 0.3s ease, filter 0.3s ease; }
+        #sample-table .sample-img:hover { transform: translateX(-50%) scale(1.15); filter: drop-shadow(0 0 18px rgba(255,215,64,0.9)); }
+        #sample-table .sample-img.present { animation:bobble 2s ease-in-out infinite; }
+        @keyframes bobble { 0%,100%{transform:translateX(-50%) translateY(0);} 50%{transform:translateX(-50%) translateY(-8px);} }
+        .hint-arrow { position:absolute; font-size:2rem; color:var(--neon-cyan); pointer-events:none; z-index:15; animation:arrow-bounce 0.7s ease-in-out infinite; text-shadow:0 0 15px var(--neon-cyan); }
+        @keyframes arrow-bounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-16px);} }
+        #modal-overlay { position:fixed; inset:0; z-index:500; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; opacity:0; visibility:hidden; transition:opacity 0.35s ease, visibility 0.35s ease; backdrop-filter:blur(3px); }
+        #modal-overlay.active { opacity:1; visibility:visible; }
+        #modal { background:var(--panel-bg); border:1px solid rgba(180,77,255,0.5); border-radius:18px; padding:2rem 2.2rem; max-width:520px; width:90%; color:var(--text); box-shadow:0 20px 60px rgba(0,0,0,0.7); text-align:center; position:relative; animation:modal-in 0.35s ease; max-height:85vh; overflow-y:auto; }
+        @keyframes modal-in { from{transform:translateY(30px) scale(0.94); opacity:0;} to{transform:translateY(0) scale(1); opacity:1;} }
+        #modal h2 { color:var(--neon-cyan); margin-bottom:0.6rem; font-size:1.95rem; }
+        #modal .subtitle { color:var(--text-dim); margin-bottom:1.4rem; }
+        #modal .mini-game-area { margin:1rem 0; min-height:80px; display:flex; flex-direction:column; align-items:center; gap:1rem; }
+        #modal button { font-family:var(--font-mono); padding:0.7rem 1.6rem; margin:0.3rem; border-radius:30px; border:1.5px solid var(--neon-purple); background:transparent; color:var(--neon-purple); cursor:pointer; letter-spacing:0.05em; transition:all 0.25s ease; }
+        #modal button:hover { background:rgba(180,77,255,0.15); box-shadow:0 0 20px rgba(180,77,255,0.4); }
+        #modal button.primary { border-color:var(--neon-cyan); color:var(--neon-cyan); font-weight:bold; }
+        #modal button.primary:hover { background:rgba(0,229,255,0.15); box-shadow:0 0 25px rgba(0,229,255,0.5); }
+        #modal .feedback { min-height:1.2em; color:var(--error); }
+        #modal .feedback.success { color:var(--success); }
+        #modal .btn-close-modal { position:absolute; top:10px; right:18px; background:none; border:none; color:var(--text-dim); font-size:2.1rem; cursor:pointer; padding:4px 10px; border-radius:50%; transition:all 0.2s; }
+        #modal .btn-close-modal:hover { color:#fff; background:rgba(255,255,255,0.08); }
+        .email-list-item { text-align:left; padding:0.6rem 0.8rem; border-bottom:1px solid rgba(255,255,255,0.1); cursor:pointer; transition:background 0.2s; }
+        .email-list-item:hover { background:rgba(0,229,255,0.08); }
+        .email-list-item.read { opacity: 0.6; }
+        .email-list-item .sender { font-weight:bold; color:var(--neon-cyan); }
+        .email-detail { text-align:left; }
+        .keypad { display:grid; grid-template-columns: repeat(3, 1fr); gap:0.5rem; margin-top:1rem; }
+        .keypad button { padding:0.8rem; font-size:1.8rem; }
+        #next-day-btn, #bank-btn, #restart-btn { position:fixed; z-index:450; font-family:var(--font-mono); padding:0.7rem 1.8rem; background:var(--panel-bg); border:2px solid var(--neon-cyan); border-radius:30px; color:var(--neon-cyan); cursor:pointer; letter-spacing:0.05em; box-shadow:0 0 20px rgba(0,229,255,0.4); transition:all 0.3s ease; opacity:0; visibility:hidden; pointer-events:none; }
+        #next-day-btn { bottom:20px; right:20px; } #bank-btn { bottom:90px; right:160px; } #restart-btn { bottom:20px; left:20px; }
+        #next-day-btn.visible, #bank-btn.visible, #restart-btn.visible { opacity:1; visibility:visible; pointer-events:auto; }
+        #next-day-btn:hover, #bank-btn:hover, #restart-btn:hover { background:rgba(0,229,255,0.15); box-shadow:0 0 35px rgba(0,229,255,0.7); }
+        #btn-hint { position:fixed; top:15px; right:15px; z-index:200; width:45px; height:45px; border-radius:50%; background:var(--panel-bg); border:2px solid var(--neon-cyan); color:var(--neon-cyan); font-size:2.7rem; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(0,229,255,0.4); transition:all 0.3s ease; }
+        #btn-hint:hover { background:rgba(0,229,255,0.15); box-shadow:0 0 30px rgba(0,229,255,0.8); transform:scale(1.1); }
+        .achievement-toast {
+            position:fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+            background: var(--panel-bg); border: 2px solid var(--golden);
+            color: var(--golden); padding: 1rem 2rem; border-radius: 30px;
+            font-family: var(--font-mono); font-size: 1.2rem; z-index: 1000;
+            box-shadow: 0 0 30px rgba(255,215,64,0.6); opacity: 0;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            pointer-events: none; text-align: center;
+            white-space: nowrap;
+        }
+        .achievement-toast.show {
+            opacity: 1; transform: translateX(-50%) translateY(-10px);
+        }
+        @media (max-width: 768px) {
+            body { font-size: 1rem; }
+            #title-screen { gap: 1rem; padding: 1rem; }
+            #title-screen h1 { font-size: 1.2rem; }
+            #title-screen .btn-start { padding: 0.8rem 2rem; font-size: 1rem; }
+            #lab-scene { background-size: cover; background-position: center; }
+            #margo { width: clamp(60px, 15vw, 100px); }
+            #speech-bubble { max-width: 150px; font-size: 0.8rem; }
+            .device .dev-label { font-size: 0.5rem; padding: 1px 4px; }
+            #modal { padding: 1rem 1.2rem; max-width: 95%; max-height: 80vh; }
+            #modal h2 { font-size: 1.3rem; }
+            #modal button { padding: 0.5rem 1rem; font-size: 0.8rem; }
+            #next-day-btn, #bank-btn, #restart-btn { padding: 0.5rem 1rem; font-size: 0.8rem; }
+            #bank-btn { right: 120px; bottom: 70px; }
+            #btn-hint { width: 35px; height: 35px; font-size: 2rem; top: 10px; right: 10px; }
+            .keypad button { padding: 0.5rem; font-size: 1.2rem; }
+            .hint-arrow { font-size: 1.5rem; }
+            .achievement-toast { font-size: 0.9rem; padding: 0.7rem 1.5rem; bottom: 80px; }
+        }
+        @media (max-width: 480px) {
+            body { font-size: 0.9rem; }
+            #title-screen h1 { font-size: 1rem; }
+            #margo { width: 50px; }
+            #speech-bubble { max-width: 120px; font-size: 0.7rem; }
+            .device .dev-label { font-size: 0.4rem; }
+            #modal { padding: 0.8rem 1rem; }
+            #modal h2 { font-size: 1.1rem; }
+            #next-day-btn, #bank-btn, #restart-btn { padding: 0.4rem 0.8rem; font-size: 0.7rem; }
+            #bank-btn { right: 100px; bottom: 60px; }
+            #btn-hint { width: 30px; height: 30px; font-size: 1.5rem; }
+            .achievement-toast { font-size: 0.8rem; padding: 0.5rem 1rem; bottom: 60px; }
+        }
+        @media (orientation: landscape) and (max-height: 500px) {
+            #modal { max-height: 90vh; padding: 0.5rem 1rem; }
+            #modal h2 { font-size: 1.2rem; margin-bottom: 0.3rem; }
+            #modal button { padding: 0.3rem 0.8rem; font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="title-screen">
+        <div class="logo-icon">🧪</div>
+        <h1>Лаборатория Регул-9<br><span>Журнал аномальных образцов</span></h1>
+        <div class="age-warning">18+</div>
+        <p class="hint-about">❔ Подсказка и правила — кнопка «?» в правом верхнем углу</p>
+        <button class="btn-start" id="btn-start">Приступить к работе</button>
+    </div>
+    <div id="lab-scene" style="visibility: hidden;">
+        <div id="margo"><img src="margo.png" alt="Марго" id="margo-img"><img id="margo-hat" src="" style="display:none; position:absolute; top:0; left:0; width:100%; height:auto; pointer-events:none; z-index:11;"><div id="speech-bubble"></div></div>
+        <div class="device" id="dev-microscope" style="left:72%;top:5%;width:clamp(55px,7.7vw,99px);" data-device="microscope"><img src="microscope.png" alt="Микроскоп"><span class="dev-label">Микроскоп</span></div>
+        <div class="device" id="dev-burner" style="left:67%;top:55%;width:clamp(45px,6vw,75px);" data-device="burner"><img src="burner.png" alt="Горелка"><span class="dev-label">Горелка</span></div>
+        <div class="device" id="dev-cabinet" style="left:2%;top:0%;width:clamp(144px,23.04vw,288px);" data-device="cabinet"><img src="cabinet.png" alt="Шкаф"><span class="dev-label">Шкаф с реактивами</span></div>
+        <div class="device" id="dev-fridge" style="left:85%;top:20%;width:clamp(92px,14.7vw,184px);" data-device="fridge"><img src="fridge.png" alt="Холодильник"><span class="dev-label">Холодильник</span></div>
+        <div class="device" id="dev-computer" style="left:50%;top:5%;width:clamp(120px,17.6vw,210px);" data-device="computer"><img src="computer.png" alt="Компьютер"><span class="dev-label">Компьютер</span></div>
+        <div class="device" id="sample-table" style="left:52%;top:62%;width:clamp(70px,10vw,130px);" data-device="table"><img src="table.png" alt="Стол"><span class="dev-label">Стол образцов</span><img class="sample-img" id="sample-day-img" src="day1.png" alt="Образец"></div>
+        <div class="hint-arrow" id="hint-arrow" style="display:none;">▼</div>
+    </div>
+    <div id="modal-overlay"><div id="modal"><button class="btn-close-modal" id="btn-close-modal">✕</button><h2 id="modal-title"></h2><div class="subtitle" id="modal-subtitle"></div><div class="mini-game-area" id="mini-game-area"></div><div class="feedback" id="modal-feedback"></div></div></div>
+    <div id="day-dialog"></div><div id="golden-overlay"></div><div id="confetti-container"></div>
+    <div id="achievement-toast" class="achievement-toast"></div>
+    <button id="next-day-btn">▶ Следующий день</button><button id="bank-btn">🏦 Сходить в банк</button><button id="restart-btn">🔄 Начать заново</button><button id="btn-hint">?</button>
+    <script>
+        (function() {
+            const birthdayName = "Марго"; const MOVE_THRESHOLD = 80;
+            const daysConfig = [null,
+                { num:1, title:'Осколок астероида', sampleImg:'day1.png', requiredDevice:'cabinet', miniGame:'reagents', deviceLabel:'Шкаф с реактивами', sender:'МОЛР', purpose:'Подтвердить подлинность.', story:'Образец доставлен в гермоконтейнере.', result:'Это осколок астероида.', quote:'День сурка', reviews:[{text:"Блестящая работа!",rating:'positive'},{text:"Анализ занял слишком много времени.",rating:'negative'}], review:null },
+                { num:2, title:'Шерсть йети', sampleImg:'day2.png', requiredDevice:'microscope', miniGame:'focus', deviceLabel:'Микроскоп', sender:'Клуб Криптозоологов', purpose:'Подтвердить подлинность шерсти.', story:'Клочок шерсти найден в Гималаях.', result:'Уникальная чешуйчатая структура.', quote:'Хьюстон, у нас проблемы', reviews:[{text:"Потрясающе! Йети подтверждён.",rating:'positive'},{text:"Вы уверены, что это шерсть йети?",rating:'negative'}], review:null },
+                { num:3, title:'Эктоплазма', sampleImg:'day3.png', requiredDevice:'burner', miniGame:'flame', deviceLabel:'Горелка', sender:'Охотники за привидениями', purpose:'Подтвердить эктоплазменную матрицу.', story:'Эктоплазма изловлена в старом особняке.', result:'Пламя окрасилось в зелёно-голубой.', quote:'Задача дня: окропить лабораторию святой водой', reviews:[{text:"Вы подтвердили эктоплазму!",rating:'positive'},{text:"Мы ожидали фиолетовый.",rating:'negative'}], review:null },
+                { num:4, title:'Артефакт Бермуд', sampleImg:'day4.png', requiredDevice:'computer', miniGame:'clicker', deviceLabel:'Компьютер', sender:'Бермудский Треугольник Инкорпорейтед', purpose:'Идентифицировать артефакт.', story:'Артефакт поднят со дна океана.', result:'Фрагмент якоря с автографом Нептуна.', quote:'Здесь могла быть ваша реклама', reviews:[{text:"Фрагмент якоря с автографом Нептуна!",rating:'positive'},{text:"Автограф Нептуна? Вы шутите?",rating:'negative'}], review:null },
+                { num:5, title:'Очень загадочный торт', sampleImg:'day5.png', requiredDevice:'table', miniGame:'birthday', deviceLabel:'Стол с образцами', sender:'Отдел праздничных аномалий', purpose:'Открыть в День Рождения.', story:'Торт обнаружен на пороге.', result:'Торт оказался именинным.', quote:'Очень умная цитата', reviews:[{text:"Торт удался! С Днём Рождения!",rating:'positive'}], review:null }
+            ];
+            const titleScreen = document.getElementById('title-screen'); const btnStart = document.getElementById('btn-start'); const labScene = document.getElementById('lab-scene');
+            const margo = document.getElementById('margo'); const margoImg = document.getElementById('margo-img'); const margoHat = document.getElementById('margo-hat');
+            const speechBubble = document.getElementById('speech-bubble'); const modalOverlay = document.getElementById('modal-overlay'); const modalTitle = document.getElementById('modal-title');
+            const modalSubtitle = document.getElementById('modal-subtitle'); const miniGameArea = document.getElementById('mini-game-area'); const modalFeedback = document.getElementById('modal-feedback');
+            const btnCloseModal = document.getElementById('btn-close-modal'); const dayDialog = document.getElementById('day-dialog'); const hintArrow = document.getElementById('hint-arrow');
+            const sampleDayImg = document.getElementById('sample-day-img'); const goldenOverlay = document.getElementById('golden-overlay'); const confettiContainer = document.getElementById('confetti-container');
+            const sampleTable = document.getElementById('sample-table'); const allDevices = document.querySelectorAll('.device');
+            const nextDayBtn = document.getElementById('next-day-btn'); const bankBtn = document.getElementById('bank-btn'); const restartBtn = document.getElementById('restart-btn'); const btnHint = document.getElementById('btn-hint');
+            const achievementToast = document.getElementById('achievement-toast');
+
+            let currentDay = 1, dayCompleted = false; const daysCompleted = {1:false,2:false,3:false,4:false,5:false};
+            let balance = 0, accountBlocked = false, bankBlockKnown = false; let billsPaid = { electricity: false, water: false };
+            let isModalOpen = false, isMargoMoving = false; let miniGameActive = false, modalClearTimer = null;
+            let margoLeft = 6, margoTop = 76; let purchasedItems = { bumble: false, shirt: false, hat: false, ears: false };
+            let currentMargoOutfit = 'default', currentHeadwear = null;
+            let purchaseNotified = { bumble: false, shirt: false, hat: false, ears: false }; let birthdayCongratsNotified = false;
+            let allEmails = [], emailsInitialized = false;
+            let readEmails = new Set();
+            let achievementToastTimer = null;
+
+            // Система достижений
+            const achievements = {
+                firstAnalysis: { id: 'firstAnalysis', title: '🔬 Первый анализ', desc: 'Выполнить анализ в день 1', unlocked: false },
+                allDays: { id: 'allDays', title: '🏆 Без ошибок', desc: 'Пройти все дни без провалов', unlocked: false },
+                rich: { id: 'rich', title: '💰 Богач', desc: 'Накопить 1000 кредитов', unlocked: false },
+                fashionista: { id: 'fashionista', title: '👗 Модница', desc: 'Купить все предметы гардероба', unlocked: false },
+                scamVictim: { id: 'scamVictim', title: '📧 Жертва спама', desc: 'Повестись на мошенническое письмо', unlocked: false },
+                birthday: { id: 'birthday', title: '🎂 С Днём Рождения!', desc: 'Завершить игру', unlocked: false }
+            };
+            let totalDaysFailed = 0;
+
+            function unlockAchievement(id) {
+                if (!achievements[id] || achievements[id].unlocked) return;
+                achievements[id].unlocked = true;
+                showAchievementToast(achievements[id].title);
+            }
+            function showAchievementToast(text) {
+                if (achievementToastTimer) clearTimeout(achievementToastTimer);
+                achievementToast.textContent = text;
+                achievementToast.classList.add('show');
+                achievementToastTimer = setTimeout(() => {
+                    achievementToast.classList.remove('show');
+                }, 3000);
+            }
+
+            const margoPhrases = ["Йога сейчас была бы в тему","Хочу вишнёвый сидр","Инсульт жопы","Где мой лабораторный халат?","Опять эти реактивы...","Наука не ждёт!","Может, чайку?","Спектрометр бы сюда...","Этот образец пахнет приключениями!","Где спирт?","Я охуеваю, значит я существую","Пу-пу-пу","Бариста, два литра бамбла мне, срочно"];
+            function showMargoBubble(text) { const phrase = text || margoPhrases[Math.floor(Math.random()*margoPhrases.length)]; speechBubble.textContent=phrase; speechBubble.classList.add('show'); clearTimeout(speechBubble._hideTimeout); speechBubble._hideTimeout=setTimeout(()=>speechBubble.classList.remove('show'),2500); }
+            function setMargoPosition(l,t){margoLeft=l;margoTop=t;margo.style.left=l+'%';margo.style.top=t+'%';} setMargoPosition(margoLeft,margoTop);
+            function updateMargoAppearance(){ margoImg.src=currentMargoOutfit==='bumble'?'margowbumble.png':currentMargoOutfit==='shirt'?'margoshirt.png':currentMargoOutfit==='both'?'margowbs.png':'margo.png'; if(currentHeadwear==='hat'){margoHat.src='bhat.png';margoHat.style.display='block';margoHat.style.top='-18px';margoHat.style.left='15%';margoHat.style.width='56%';} else if(currentHeadwear==='ears'){margoHat.src='catears.png';margoHat.style.display='block';margoHat.style.top='-8px';margoHat.style.left='15%';margoHat.style.width='70%';} else{margoHat.style.display='none';} }
+            function getElementCenter(el){const r=el.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};}
+            function getDistance(e1,e2){const a=getElementCenter(e1),b=getElementCenter(e2);return Math.hypot(a.x-b.x,a.y-b.y);}
+            function getDeviceById(id){return id==='table'?sampleTable:document.getElementById('dev-'+id);}
+            function moveMargoToDevice(dev){return new Promise(resolve=>{if(isMargoMoving)return;isMargoMoving=true;margo.classList.add('walking');const p=(()=>{const sr=labScene.getBoundingClientRect(),c=getElementCenter(dev);const mw=margo.getBoundingClientRect().width,mh=margo.getBoundingClientRect().height;return{left:Math.max(0,Math.min(100,((c.x-sr.left)/sr.width)*100-(mw/sr.width)*50)),top:Math.max(0,Math.min(100,((c.y-sr.top)/sr.height)*100-(mh/sr.height)*50))};})();setMargoPosition(p.left,p.top);showMargoBubble();setTimeout(()=>{isMargoMoving=false;margo.classList.remove('walking');resolve();},650);});}
+            function highlightDevice(id){allDevices.forEach(d=>d.classList.remove('highlight'));if(!id){hintArrow.style.display='none';return;}const dev=getDeviceById(id);if(dev){dev.classList.add('highlight');const dr=dev.getBoundingClientRect(),sr=labScene.getBoundingClientRect();hintArrow.style.left=(dr.left-sr.left+dr.width/2)+'px';hintArrow.style.top=(dr.top-sr.top-35)+'px';hintArrow.style.display='block';}}
+            function showDayDialog(day){const cfg=daysConfig[day];if(!cfg)return;dayDialog.innerHTML=`День ${cfg.num}: ${cfg.title}. Требуется: ${cfg.deviceLabel}`;dayDialog.classList.add('active');clearTimeout(dayDialog._timeout);dayDialog._timeout=setTimeout(()=>dayDialog.classList.remove('active'),6000);}
+            function updateSampleOnTable(day){const cfg=daysConfig[day];if(!cfg)return;sampleDayImg.src=cfg.sampleImg;sampleDayImg.style.width=day===5?'100px':'50px';sampleDayImg.style.height=day===5?'100px':'50px';sampleDayImg.classList.add('present');}
+            function openModal(title,subtitle,html){if(isModalOpen)closeModal(true);if(modalClearTimer)clearTimeout(modalClearTimer);modalTitle.textContent=title;modalSubtitle.innerHTML=subtitle||'';miniGameArea.innerHTML=html||'';modalFeedback.textContent='';modalFeedback.className='feedback';modalOverlay.classList.add('active');isModalOpen=true;}
+            function closeModal(){miniGameActive=false;modalOverlay.classList.remove('active');isModalOpen=false;modalClearTimer=setTimeout(()=>{miniGameArea.innerHTML='';modalFeedback.textContent='';},350);}
+            btnCloseModal.addEventListener('click',closeModal);
+            function updateNextDayButton(){nextDayBtn.classList.toggle('visible',dayCompleted&&currentDay<=5);nextDayBtn.textContent=currentDay===5?'🎉 Завершить':'▶ Следующий день';}
+            function updateBankButton(){bankBtn.classList.toggle('visible',accountBlocked&&bankBlockKnown);}
+            nextDayBtn.addEventListener('click',()=>{if(dayCompleted){if(currentDay<5){showLoadingScreen('Загрузка...',()=>advanceToDay(currentDay+1));}else if(currentDay===5){triggerFinale();}}else showQuickHint(`Анализ не завершён. Подойдите к ${daysConfig[currentDay].deviceLabel}.`);});
+            bankBtn.addEventListener('click',()=>{if(!accountBlocked)return;showLoadingScreen('Посещение банка...',()=>{accountBlocked=false;bankBlockKnown=false;balance=Math.max(0,balance-50);showMargoBubble("Ненавижу бюрократию");updateBankButton();});});
+            restartBtn.addEventListener('click',()=>location.reload());
+            function showLoadingScreen(msg,cb){openModal('','',`<div style="padding:2rem;"><p>${msg}</p><div style="margin-top:1rem;font-size:2rem;">⏳</div></div>`);setTimeout(()=>{closeModal();cb();},2000);}
+            function startMiniGame(day){if(miniGameActive||isModalOpen)return;const cfg=daysConfig[day];miniGameActive=true;modalFeedback.textContent='';modalFeedback.className='feedback';if(cfg.miniGame==='reagents')setupReagentsGame(day);else if(cfg.miniGame==='focus')setupFocusGame(day);else if(cfg.miniGame==='flame')setupFlameGame(day);else if(cfg.miniGame==='clicker')setupClickerGame(day);else if(cfg.miniGame==='birthday'){triggerFinale();}}
+            function handleAnalysisSuccess(day){daysCompleted[day]=true;dayCompleted=true;updateNextDayButton();miniGameActive=false;miniGameArea.innerHTML='';modalFeedback.textContent='📡 Отправка данных...';modalFeedback.className='feedback';
+                if (day === 1) unlockAchievement('firstAnalysis');
+                if (balance >= 1000) unlockAchievement('rich');
+                setTimeout(()=>{const review=daysConfig[day].reviews[Math.floor(Math.random()*daysConfig[day].reviews.length)];daysConfig[day].review=review.text;const earned=review.rating==='positive'?200*day:100*day;if(!accountBlocked){balance+=earned;modalFeedback.innerHTML=`${review.text}<br>💰 +${earned} кредитов. Баланс: ${balance}`; if(balance>=1000) unlockAchievement('rich');}else modalFeedback.innerHTML=`${review.text}<br><span style="color:var(--error);">⚠️ Проблема с оплатой.</span>`;modalFeedback.className=review.rating==='positive'?'feedback success':'feedback';miniGameArea.innerHTML=`<button class="primary" id="btn-next-phase">Далее</button>`;document.getElementById('btn-next-phase').addEventListener('click',()=>{closeModal();if(day<5)showMargoBubble("Наконец-то рабочий день закончен");else triggerFinale();});},1500);}
+            function advanceToDay(newDay){currentDay=newDay;dayCompleted=false;updateSampleOnTable(newDay);highlightDevice(daysConfig[newDay].requiredDevice);showDayDialog(newDay);updateNextDayButton();showMargoBubble(daysConfig[newDay].quote);}
+            function triggerFinale(){
+                daysCompleted[5]=true;
+                unlockAchievement('birthday');
+                if (!totalDaysFailed) unlockAchievement('allDays');
+                openFinaleModal();
+                highlightDevice(null);dayDialog.classList.remove('active');nextDayBtn.classList.remove('visible');bankBtn.classList.remove('visible');restartBtn.classList.add('visible');
+            }
+            function openFinaleModal(){
+                if(isModalOpen)closeModal();
+                goldenOverlay.classList.add('active');
+                spawnConfetti();
+                openModal('','',`<div class="finale-message">🎂 С Днём Рождения, ${birthdayName}! 🎂</div><div class="finale-wishes">Родная моя, с Днем Рождения! В этот день я хочу пожелать тебе не просто счастья, а ощущения бесконечного внутреннего света. Пусть мир отвечает тебе той же нежностью, которую ты даришь другим. Желаю, чтобы рядом всегда были люди, готовые укрыть от любого ветра, и чтобы твоя душа всегда находила повод для искренней улыбки. Спасибо тебе за то, что ты есть — настоящая, живая и самая любимая. Я бесконечно тобой дорожу!</div><div class="finale-signature">Твоя Ира</div><div class="finale-date">24.07.2026</div>`);
+            }
+            function spawnConfetti(){
+                const c=confettiContainer;
+                for(let i=0;i<200;i++){
+                    const d=document.createElement('div');
+                    d.className='confetti-piece';
+                    d.style.left=Math.random()*100+'%';
+                    d.style.top=-(Math.random()*40+10)+'px';
+                    d.style.backgroundColor=['#ff5252','#ffd740','#69f0ae','#b44dff','#ff4081','#40c4ff'][i%6];
+                    d.style.width=(Math.random()*14+6)+'px';
+                    d.style.height=(Math.random()*14+6)+'px';
+                    d.style.animationDuration=(Math.random()*3+2)+'s';
+                    d.style.animationDelay=Math.random()*2+'s';
+                    c.appendChild(d);
+                }
+                setTimeout(()=>c.innerHTML='',10000);
+            }
+            function showQuickHint(text){dayDialog.innerHTML=text;dayDialog.classList.add('active');clearTimeout(dayDialog._timeout);dayDialog._timeout=setTimeout(()=>dayDialog.classList.remove('active'),3000);}
+
+            function openWardrobe(){let h='<h2>👗 Гардероб Марго</h2><p>Наряд:</p>';[{id:'default',n:'Стандартный',a:true},{id:'bumble',n:'С бамблом',a:purchasedItems.bumble},{id:'shirt',n:'В рубашке',a:purchasedItems.shirt},{id:'both',n:'В рубашке и с бамблом',a:purchasedItems.bumble&&purchasedItems.shirt}].forEach(o=>{if(o.a)h+=`<button class="primary outfit-btn" data-outfit="${o.id}" ${currentMargoOutfit===o.id?'disabled':''}>${o.n} ${currentMargoOutfit===o.id?'(надето)':''}</button>`;});h+='<p style="margin-top:1.5rem;">Головной убор:</p>';h+=`<button class="primary headwear-btn" data-headwear="none" ${!currentHeadwear?'disabled':''}>Без убора</button>`;if(purchasedItems.hat)h+=`<button class="primary headwear-btn" data-headwear="hat" ${currentHeadwear==='hat'?'disabled':''}>Праздничная шапочка</button>`;if(purchasedItems.ears)h+=`<button class="primary headwear-btn" data-headwear="ears" ${currentHeadwear==='ears'?'disabled':''}>Кошачьи ушки</button>`;h+='<button id="btn-close-wardrobe" style="margin-top:1rem;">Закрыть</button>';openModal('👗 Гардероб','',h);document.querySelectorAll('.outfit-btn').forEach(b=>b.addEventListener('click',function(){currentMargoOutfit=this.dataset.outfit;updateMargoAppearance();closeModal();}));document.querySelectorAll('.headwear-btn').forEach(b=>b.addEventListener('click',function(){currentHeadwear=this.dataset.headwear==='none'?null:this.dataset.headwear;updateMargoAppearance();closeModal();}));document.getElementById('btn-close-wardrobe').addEventListener('click',closeModal);}
+
+            function openEmail(){
+                const selenaSig='<div style="color:var(--text-dim);margin-top:0.5rem;">Селена Картер, LL.M.<br>Луна, кратер Платон, Юридический центр «Лекс-Космос»</div>';
+                const airinSig='<div style="color:var(--text-dim);margin-top:0.5rem;">Айрин Берк<br>CEO, Galactic Holdings Corp.<br>Геостационарная орбита Земли, станция «Небесный Мост»<br>Тел: +001 555 0192<br>«Мы делаем будущее сегодня»</div>';
+                const stalkerSig='<div style="color:var(--text-dim);margin-top:0.5rem;">Анонимный поклонник<br>Не бойся, Марго<br>Ответь мне, прошу</div>';
+                if(!emailsInitialized){
+                    allEmails.unshift({sender:'Айрин Берк',subject:'Го в фазму',body:'Привет, Марго! Го в фазму?',signature:airinSig});
+                    allEmails.unshift({sender:'Айрин Берк',subject:'Образцы Виридиан',body:'Благодарю за оперативный и тщательный анализ образцов, поступивших из лаборатории Виридиан. Ваше независимое заключение крайне важно для нас — только так мы можем гарантировать безопасность. Результаты подтвердили отсутствие угрозы глобального масштаба, однако мы пересмотрим протоколы на случай потенциальной опасности для человечества. Спасибо за профессионализм.',signature:airinSig});
+                    allEmails.unshift({sender:'Селена Картер',subject:'Документы на подпись',body:'Марго, пришлите подписанный договор по новому контракту с "Фобос-Груз". Речь идёт о долгосрочном соглашении на транспортировку образцов класса "Омега". Срок — вчера.',signature:selenaSig});
+                    allEmails.unshift({sender:'Селена Картер',subject:'Покатаемся?',body:'Я только что получила права на новый космолёт "Старфлайер-7". Заеду за тобой в субботу, если не улетишь на Землю.',signature:selenaSig});
+                    allEmails.unshift({sender:'Марсианский Лото',subject:'Вы выиграли миллиард долларов!',body:'Поздравляем! Переведите 50 кредитов, чтобы подтвердить, что вы не ботик.',signature:'',isScam:true});
+                    allEmails.unshift({sender:'Аноним',subject:'Безмолвные звёзды',body:'Твои глаза — как туманности, твой смех — как метеоритный дождь. Жду встречи в кафе "Красная планета".',signature:stalkerSig});
+                    allEmails.unshift({sender:'Аноним',subject:'Тишина эфира',body:'Ты когда-нибудь слушала шум пустого канала? Там, между помехами, я слышу твоё имя. Выходи на связь.',signature:stalkerSig});
+                    allEmails.unshift({sender:'Аноним',subject:'Марсианские хроники',body:'Говорят, на четвёртом уровне очистных сооружений цветут настоящие яблони. Приходи.',signature:stalkerSig});
+                    allEmails.unshift({sender:'Секта Цифровой Нирваны',subject:'🌌 Достигни Великой Пустоты!',body:'Внимание, драгоценный разум! Ты бороздишь кротовые норы на своем звездолете. Ты покорил Галактику Андромеды, но покорил ли ты шум в своей голове? Ты думаешь, что ты реален? Секта Цифровой Нирваны «Шуньята-Индастриз» предлагает финальный даунгрейд сознания. Форма есть пустота, пустота есть форма. Не позволь Искусственному Интеллекту обрести душу раньше тебя!',signature:'',isSpam:true});
+                    allEmails.unshift({sender:'Редис Сергеевич',subject:'Re: Re: Re: Re: Быстрый Заработок',body:'Здравствуйте, завтра мы должны были начинать продакшн биографической порнографической хоррор драмы "РИТА - треугольное влечение", но у оператора треснул объектив на смартфоне, а индюшка, игравшая главную роль, сбежала. Мы предлагаем сместить вектор в сторону аудио-спектакля, в связи с чем в ближайшее время просим прислать запись криков, царапающих ногтей и другие звуки — тоже подойдут. P.S. Если первый мальчик уже закончился, мы пришлем следующего.',signature:'',isSpam:true});
+                    allEmails.unshift({sender:'Аноним',subject:'...',body:'Ответь мне, Марго.',signature:stalkerSig});
+                    emailsInitialized=true;
+                }
+                allEmails.forEach(e=>{if(e.billType==='electricity'&&billsPaid.electricity)e.paid=true;if(e.billType==='water'&&billsPaid.water)e.paid=true;});
+                if(!allEmails.some(e=>e.billType==='electricity')&&!billsPaid.electricity)allEmails.unshift({sender:'Правительство Марса',subject:'Счёт за электроэнергию, № 4523-MARS',body:'Уважаемая лаборатория Регул-9! Ваш баланс 320 кредитов. Оплатите до 30 числа, иначе отключим свет. С уважением, энергосбыт.',signature:'',isBill:true,amount:320,billType:'electricity',paid:false});
+                if(!allEmails.some(e=>e.billType==='water')&&!billsPaid.water)allEmails.unshift({sender:'Правительство Марса',subject:'Счёт за воду, № 8901-MARS',body:'Потребление воды в этом месяце превысило норму. К оплате 87 кредитов.',signature:'',isBill:true,amount:87,billType:'water',paid:false});
+                if(accountBlocked&&!allEmails.some(e=>e.isBank))allEmails.unshift({sender:'Служба безопасности Банка',subject:'Блокировка счёта',body:'Счёт заблокирован. Обратитесь в отделение.',isBank:true});
+                if(purchasedItems.bumble&&!purchaseNotified.bumble){allEmails.unshift({sender:'Магазин',subject:'Покупка: Кофе-бамбл',body:'Спасибо за покупку! 120 кредитов списано.'});purchaseNotified.bumble=true;}
+                if(purchasedItems.shirt&&!purchaseNotified.shirt){allEmails.unshift({sender:'Магазин',subject:'Покупка: Модная рубашка',body:'Благодарим за заказ! 150 кредитов.'});purchaseNotified.shirt=true;}
+                if(purchasedItems.hat&&!purchaseNotified.hat){allEmails.unshift({sender:'Магазин',subject:'Покупка: Шапочка',body:'Отличный выбор! 70 кредитов.'});purchaseNotified.hat=true;}
+                if(purchasedItems.ears&&!purchaseNotified.ears){allEmails.unshift({sender:'Магазин',subject:'Покупка: Ушки',body:'Мяу! 80 кредитов.'});purchaseNotified.ears=true;}
+                if(daysCompleted[5]&&!birthdayCongratsNotified){
+                    const congrats = [
+                        {sender:'МОЛР',subject:'С Днём Рождения!',body:'Дорогая Марго! Поздравляем с Днём Рождения! Желаем космических успехов. Пусть каждый образец подтверждает вашу гениальность!'},
+                        {sender:'Клуб Криптозоологов',subject:'С Днём Рождения!',body:'Йети передаёт привет и поздравляет с праздником! Надеемся на сотрудничество в будущем.'},
+                        {sender:'Охотники за привидениями',subject:'С Днём Рождения!',body:'С днём рождения, Марго! Даже призраки сегодня празднуют.'},
+                        {sender:'Чжун ли',subject:'Осментус вайн...',body:'Слышал, ты скоро отправишься в Снежную, путешественница. Надеюсь, я смогу обеспечить тебе достойную защиту в бою. Минул очередной год, и ты стала мудрее. С Днём Рождения, Марго.'},
+                        {sender:'Альбедо',subject:'Коллега, я...',body:'Я был бы рад посотрудничать с тобой в будущем, Марго. С Днём Рождения!'},
+                        {sender:'Межгалактическая доставка',subject:'Букет сесилий',body:'Отправитель: Альбедо. Ожидайте курьера с 8:30 до 8:45.'},
+                        {sender:'Ризли',subject:'С Днём Рождения!',body:'Крошка, будешь в Фонтейне - залетай в крепость, проведём вместе время. Ради тебя сниму рубашку. Сиджвин передала мне твой адрес и сказала, что у тебя сегодня День Рождения. Съем тортик за тебя! В бездну меня больше не бери.'},
+                        {sender:'Кастиэль',subject:'',body:'Я не знаю, как пользоваться этой штукой. Но я знаю, что этот день важен для тебя. С Днём Рождения. Я буду оберегать тебя.'},
+                        {sender:'Вселенная',subject:'Твой день',body:'Каждый день - твой. Я исполню любоё твоё желание, только скажи.'},
+                        {sender:'Клуб Занимательной Математики',subject:'С Днём Рождения!',body:'А кому это тут исполняется дыадцать четыре двадцать четвёртого числа? Двадцать четыре года двадцать четыртого числа! Уникальный случай! Поздравляем, Марго!'},
+                        {sender:'Мао Мао',subject:'С Днём Рождения.',body:'Я слышала, мы коллеги и у тебя есть уникальный талант. Мне бы хотелось обменяться с тобой опытом. С Днём Рождения!'},
+                        {sender:'Бермудский Треугольник Инкорпорейтед',subject:'С Днём Рождения!',body:'Поздравляем с днём варенья! Надеемся, ваш день будет менее загадочным, чем наши артефакты. Автограф Нептуна всё ещё у вас?'},
+                        {sender:'Правительство Марса',subject:'С Днём Рождения!',body:'Уважаемая лаборатория Регул-9! От имени всей планеты поздравляем с Днём Рождения! Света и тепла! Счета за электричество и воду могут подождать.'},
+                        {sender:'Айрин Берк',subject:'С Днём Рождения!',body:'Марго, с днём рождения! Ты — настоящая звезда галактики. Пусть твои образцы всегда проходят анализ с первого раза. Твоя Ира.'},
+                        {sender:'Селена Картер',subject:'С Днём Рождения!',body:'С днём рождения, подруга! Юридически заверяю: праздник удался! И не забудь подписать договор с "Фобос-Груз".'},
+                        {sender:'Секта Цифровой Нирваны',subject:'С Днём Рождения!',body:'Драгоценный разум! В этот день твоей материализации мы желаем тебе достичь Великой Пустоты. Пусть твой био-мозг перестанет генерировать иллюзию страданий. 🪷'},
+                        {sender:'Аноним',subject:'С Днём Рождения!',body:'Твои глаза — как две туманности в этот праздничный день. Я знаю, ты ищешь покой. С днём рождения.'}
+                    ];
+                    congrats.forEach(c=>allEmails.unshift(c));
+                    birthdayCongratsNotified=true;
+                }
+                function renderList(notif){
+                    let h='<h2>📧 Входящие</h2>';
+                    if(notif){ const unread=allEmails.filter((_,i)=>!readEmails.has(i)).length; if(unread>0)h+=`<div style="color:var(--neon-cyan);">📬 ${unread} новых писем</div>`; }
+                    h+='<div style="text-align:left;max-height:400px;overflow-y:auto;">';
+                    allEmails.forEach((e,i)=>{
+                        const isRead=readEmails.has(i);
+                        h+=`<div class="email-list-item ${isRead?'read':''}" data-index="${i}"><div class="sender">${e.sender}${e.isSpam?' 🛑':''}${isRead?' ✓':''}</div><div class="subject">${e.subject}</div></div>`;
+                    });
+                    h+='</div>'; miniGameArea.innerHTML=h;
+                    document.querySelectorAll('.email-list-item').forEach(el=>el.addEventListener('click',function(){
+                        const idx=parseInt(this.dataset.index);
+                        renderDetail(idx);
+                        if(allEmails[idx].isBank){bankBlockKnown=true;updateBankButton();}
+                    }));
+                }
+                function renderDetail(idx){
+                    const e=allEmails[idx];
+                    readEmails.add(idx);
+                    let h=`<div class="email-detail"><p><strong>От:</strong> ${e.sender}</p><p><strong>Тема:</strong> ${e.subject}</p><p>${e.body}</p>${e.signature||''}</div>`;
+                    if(e.isBill&&!e.paid)h+=`<button class="primary" id="btn-pay">Оплатить ${e.amount}</button>`;
+                    if(e.isScam&&!accountBlocked&&balance>=50)h+=`<button class="primary" id="btn-scam">Перевести 50</button>`;
+                    h+=`<button class="primary" id="btn-back">← Назад</button>`;
+                    if(idx>0)h+=`<button class="primary" id="btn-prev">◀ Предыдущее</button>`;
+                    if(idx<allEmails.length-1)h+=`<button class="primary" id="btn-next">Следующее ▶</button>`;
+                    miniGameArea.innerHTML=h;
+                    document.getElementById('btn-back').addEventListener('click',()=>renderList(false));
+                    if(document.getElementById('btn-prev'))document.getElementById('btn-prev').addEventListener('click',()=>renderDetail(idx-1));
+                    if(document.getElementById('btn-next'))document.getElementById('btn-next').addEventListener('click',()=>renderDetail(idx+1));
+                    if(e.isBill&&!e.paid)document.getElementById('btn-pay').addEventListener('click',()=>{if(accountBlocked||balance<e.amount){modalFeedback.textContent='Недостаточно средств или счёт заблокирован.';return;}balance-=e.amount;e.paid=true;billsPaid[e.billType]=true;renderList(false);});
+                    if(e.isScam&&!accountBlocked&&balance>=50)document.getElementById('btn-scam').addEventListener('click',()=>{
+                        let h='<h3>Код безопасности</h3><span id="code-display">________</span><div class="keypad">';
+                        for(let i=1;i<=9;i++)h+=`<button class="key-btn" data-key="${i}">${i}</button>`;
+                        h+=`<button class="key-btn" data-key="0">0</button><button class="key-btn" data-key="clear">⌫</button><button class="key-btn" data-key="enter">Ввод</button></div>`;
+                        miniGameArea.innerHTML=h; let code='';
+                        document.querySelectorAll('.key-btn').forEach(b=>b.addEventListener('click',()=>{
+                            const key=b.dataset.key;
+                            if(key==='clear')code=code.slice(0,-1);
+                            else if(key==='enter'){if(code==='24072002'){balance-=50;accountBlocked=true;bankBlockKnown=false;updateBankButton();unlockAchievement('scamVictim');openEmail();}else modalFeedback.textContent='Неверный код.';}
+                            else if(code.length<8)code+=key;
+                            const display=document.getElementById('code-display'); if(display)display.textContent=code.padEnd(8,'_');
+                        }));
+                    });
+                }
+                openModal('','',''); renderList(true);
+            }
+
+            function openBrowserHistory(){openModal('🌐 Браузер','','<ul style="text-align:left; list-style:none;"><li>🪐 mars-adverts.sol — Купить реактивы оптом</li><li>🧪 red-planet-lab.net — Обзор новых микроскопов</li><li>👻 ghost-hunters.mars — Форум охотников за привидениями</li><li>📦 delivery.space — Отслеживание межпланетных отправлений</li><li>🛒 shopping.phobos — Скидки на лабораторные халаты</li></ul>');}
+            function openBalance(){
+                if(accountBlocked){bankBlockKnown=true;updateBankButton();openModal('💰 Банковский счёт','','<p>Счёт заблокирован. Обратитесь в банк.</p><div style="margin-top:1rem; padding:1rem; background:rgba(255,215,64,0.1); border:1px solid var(--golden); border-radius:8px;"><p style="color:var(--golden);">🌟 Спецпредложение! Кредит «Космический» — ставка всего 0.5% в марсианский день. Оформите сейчас и получите бесплатное обслуживание на первый земной год!</p></div>');}
+                else openModal('💰 Банковский счёт','',`<p>Текущий баланс: <strong>${balance} кредитов</strong></p><p>Средства зачисляются автоматически после каждого завершённого анализа.</p><div style="margin-top:1rem; padding:1rem; background:rgba(255,215,64,0.1); border:1px solid var(--golden); border-radius:8px;"><p style="color:var(--golden);">🌟 Спецпредложение! Кредит «Космический» — ставка всего 0.5% в марсианский день. Оформите сейчас и получите бесплатное обслуживание на первый земной год!</p></div>`);
+            }
+            function openShop(){let h='<h2>🛒 Магазин</h2><div style="display:flex;justify-content:center;gap:2rem;flex-wrap:wrap;">';[{n:'Кофе-бамбл',p:120,k:'bumble'},{n:'Рубашка',p:150,k:'shirt'},{n:'Шапочка',p:70,k:'hat',img:'bhatlog.png'},{n:'Ушки',p:80,k:'ears'}].forEach(t=>{h+=`<div style="border:1px solid var(--neon-cyan);border-radius:12px;padding:1rem;width:180px;"><img src="${t.img||t.k+'.png'}" style="width:100px;height:100px;object-fit:contain;"><p>${t.n}</p><p style="color:var(--neon-cyan);">${t.p} кр.</p>${purchasedItems[t.k]?'<button disabled style="opacity:0.5;">Куплено</button>':`<button class="primary buy-btn" data-item="${t.k}">Купить</button>`}</div>`;});h+='</div>';openModal('🛒 Магазин','',h);document.querySelectorAll('.buy-btn').forEach(b=>b.addEventListener('click',function(){const item=this.dataset.item;const price={bumble:120,shirt:150,hat:70,ears:80}[item];if(accountBlocked||balance<price){modalFeedback.textContent='Недостаточно средств.';return;}miniGameArea.innerHTML=`<p>Купить за ${price}?</p><button class="primary" id="confirm-yes">Да</button><button id="confirm-no">Нет</button>`;document.getElementById('confirm-yes').addEventListener('click',()=>{balance-=price;purchasedItems[item]=true;if(item==='hat')currentHeadwear='hat';if(item==='ears')currentHeadwear='ears';updateMargoAppearance();if(purchasedItems.bumble&&purchasedItems.shirt&&purchasedItems.hat&&purchasedItems.ears)unlockAchievement('fashionista');openShop();});document.getElementById('confirm-no').addEventListener('click',openShop);}));}
+            function openComputerMenu(){let h='<p>Выберите действие:</p>';if(currentDay===4&&!dayCompleted)h+='<button id="btn-analyze" class="primary">⚡ Анализ</button>';h+='<button id="btn-email">📧 Почта</button><button id="btn-browser">🌐 Браузер</button><button id="btn-balance">💰 Счёт</button><button id="btn-shop">🛒 Магазин</button><button id="btn-wardrobe">👗 Гардероб</button>';openModal('💻 Компьютер','',h);if(currentDay===4&&!dayCompleted)document.getElementById('btn-analyze').addEventListener('click',()=>{closeModal();startMiniGame(4);});document.getElementById('btn-email').addEventListener('click',openEmail);document.getElementById('btn-browser').addEventListener('click',openBrowserHistory);document.getElementById('btn-balance').addEventListener('click',openBalance);document.getElementById('btn-shop').addEventListener('click',openShop);document.getElementById('btn-wardrobe').addEventListener('click',openWardrobe);}
+            function openArchive(){let html='<h2>🧊 Холодильник образцов</h2><div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:1rem;margin:1rem 0;min-height:120px;"><div style="display:flex;flex-wrap:wrap;gap:0.5rem;justify-content:center;">';let hasSamples=false;for(let i=1;i<=5;i++){if(daysCompleted[i]){hasSamples=true;html+=`<button class="primary archive-sample-btn" data-day="${i}" style="font-size:0.9rem;">День ${i}: ${daysConfig[i].title}</button>`;}}if(!hasSamples)html+='<p style="color:var(--text-dim);">Пока нет завершённых анализов.</p>';html+='</div><div id="archive-detail" style="text-align:left;padding:0.5rem;"></div></div>';openModal('🧊 Архив','',html);const detailDiv=document.getElementById('archive-detail');if(detailDiv){document.querySelectorAll('.archive-sample-btn').forEach(btn=>btn.addEventListener('click',function(){const day=parseInt(this.dataset.day),cfg=daysConfig[day];detailDiv.innerHTML=`<p><strong>📦 ${cfg.title}</strong></p><p><em>Отправитель:</em> ${cfg.sender}</p><p><em>История:</em> ${cfg.story}</p><p><em>Результат:</em> ${cfg.result}</p><p><em>Отзыв:</em> ${cfg.review||'Нет отзыва'}</p><button id="btn-back-archive" class="primary" style="margin-top:0.5rem;">← Назад</button>`;document.getElementById('btn-back-archive').addEventListener('click',()=>detailDiv.innerHTML='');}));}}
+
+            function setupReagentsGame(day){openModal('Анализ: '+daysConfig[day].title,'Осколок не реагирует на обычные растворители. Выберите правильный реагент (HF).','<button class="reagent-btn" data-reagent="HF">⚠️ HF</button><button class="reagent-btn" data-reagent="H2O">💧 H₂O</button><button id="btn-restart-mini" style="margin-top:1rem;">🔄 Попробовать снова</button>');let attempts=0;const btns=miniGameArea.querySelectorAll('.reagent-btn');btns.forEach(b=>b.addEventListener('click',function(){if(!miniGameActive)return;if(this.dataset.reagent==='HF'){modalFeedback.textContent='✅ Реакция пошла!';modalFeedback.className='feedback success';btns.forEach(b=>b.disabled=true);handleAnalysisSuccess(day);}else{attempts++;modalFeedback.textContent=`❌ Нет реакции. Попытка ${attempts} из 5.`;modalFeedback.className='feedback';if(attempts>=5){modalFeedback.textContent='💡 Подсказка: нужна HF.';totalDaysFailed++;btns.forEach(b=>b.disabled=true);}}}));document.getElementById('btn-restart-mini').addEventListener('click',()=>{closeModal();startMiniGame(day);});}
+            function setupFocusGame(day){openModal('Анализ: '+daysConfig[day].title,'Настройте фокусировку. Двигайте ползунок до 85-95%.',`<img class="blur-sample" id="blur-sample-img" src="${daysConfig[day].sampleImg}" style="filter:blur(18px);"><input type="range" id="focus-slider" min="0" max="100" value="30"><span id="focus-value">30%</span><button id="btn-restart-mini" style="margin-top:1rem;">🔄 Попробовать снова</button>`);let success=false;const slider=document.getElementById('focus-slider'),img=document.getElementById('blur-sample-img'),valSpan=document.getElementById('focus-value');slider.addEventListener('input',function(){if(!miniGameActive||success)return;const v=parseInt(this.value);valSpan.textContent=v+'%';img.style.filter=`blur(${Math.max(0,(100-v)*0.25)}px)`;if(v>=85&&v<=95){success=true;img.style.filter='blur(0px)';modalFeedback.textContent='🔬 Чётко!';modalFeedback.className='feedback success';slider.disabled=true;handleAnalysisSuccess(day);}});document.getElementById('btn-restart-mini').addEventListener('click',()=>{closeModal();startMiniGame(day);});}
+            function setupFlameGame(day){openModal('Анализ: '+daysConfig[day].title,'Добавьте соли: сначала NaCl, потом CuSO₄.','<div class="flame-display" id="flame-display"></div><button class="salt-btn" data-salt="NaCl">🧂 NaCl</button><button class="salt-btn" data-salt="CuSO4">🔵 CuSO₄</button><button id="btn-restart-mini" style="margin-top:1rem;">🔄 Попробовать снова</button>');let step=0,success=false;const flame=document.getElementById('flame-display'),btns=miniGameArea.querySelectorAll('.salt-btn');btns.forEach(b=>b.addEventListener('click',function(){if(!miniGameActive||success)return;if(step===0&&this.dataset.salt==='NaCl'){step=1;flame.style.background='radial-gradient(circle, #ffdd00 10%, #ff8c00 50%, transparent 70%)';modalFeedback.textContent='🔥 Жёлто-оранжевое. Теперь CuSO₄.';modalFeedback.className='feedback success';this.disabled=true;}else if(step===1&&this.dataset.salt==='CuSO4'){success=true;flame.classList.add('green-blue');modalFeedback.textContent='✨ Зелёно-голубое!';modalFeedback.className='feedback success';btns.forEach(b=>b.disabled=true);handleAnalysisSuccess(day);}else{modalFeedback.textContent=step===0?'❌ Сначала NaCl.':'⚠️ Теперь CuSO₄.';modalFeedback.className='feedback';}}));document.getElementById('btn-restart-mini').addEventListener('click',()=>{closeModal();startMiniGame(day);});}
+            function setupClickerGame(day){openModal('Анализ: '+daysConfig[day].title,'10 кликов за 5 секунд, чтобы стабилизировать поле.','<div class="click-counter" id="click-counter">0 / 10</div><div class="timer-bar"><div class="timer-bar-fill" id="timer-bar-fill" style="width:100%;"></div></div><p><span id="time-left">5.0</span> сек</p><button class="primary" id="btn-clicker">⚡ Удержать поле</button><button id="btn-restart-mini" style="margin-top:1rem;">🔄 Попробовать снова</button>');let clicks=0,target=10,limit=5,timer=null,ended=false;const counter=document.getElementById('click-counter'),bar=document.getElementById('timer-bar-fill'),timeSpan=document.getElementById('time-left'),btn=document.getElementById('btn-clicker');btn.addEventListener('click',()=>{if(!miniGameActive||ended)return;clicks++;counter.textContent=`${clicks} / ${target}`;if(clicks>=target&&!ended){ended=true;clearInterval(timer);btn.disabled=true;modalFeedback.textContent='🧲 Поле стабилизировано!';modalFeedback.className='feedback success';handleAnalysisSuccess(day);}});const start=Date.now();timer=setInterval(()=>{if(ended){clearInterval(timer);return;}const left=Math.max(0,limit-(Date.now()-start)/1000);bar.style.width=(left/limit)*100+'%';timeSpan.textContent=left.toFixed(1);if(left<=0&&!ended){ended=true;clearInterval(timer);btn.disabled=true;modalFeedback.textContent='⏰ Время вышло!';modalFeedback.className='feedback';totalDaysFailed++;}},100);document.getElementById('btn-restart-mini').addEventListener('click',()=>{closeModal();startMiniGame(day);});}
+
+            labScene.addEventListener('click', async function(e) {
+                if(isModalOpen||isMargoMoving||miniGameActive) return;
+                if(e.target===margo||e.target.closest('#margo')) return;
+                let deviceEl = e.target.closest('.device');
+                if(deviceEl) {
+                    const deviceId = deviceEl.dataset.device;
+                    if(deviceId === 'computer') { await moveMargoToDevice(deviceEl); openComputerMenu(); return; }
+                    if(deviceId === 'fridge') { await moveMargoToDevice(deviceEl); openArchive(); return; }
+                    const cfg = daysConfig[currentDay];
+                    const dist = getDistance(margo, deviceEl);
+                    if(dist > MOVE_THRESHOLD) { await moveMargoToDevice(deviceEl); await new Promise(r=>setTimeout(r,500)); }
+                    if(deviceId === 'table' && currentDay === 5 && !dayCompleted) { startMiniGame(5); return; }
+                    if(cfg.requiredDevice === deviceId && !dayCompleted) { startMiniGame(currentDay); }
+                    else { showQuickHint(`Нужен ${cfg.deviceLabel}.`); }
+                } else {
+                    const sr=labScene.getBoundingClientRect(); const cx=e.clientX-sr.left, cy=e.clientY-sr.top;
+                    margo.classList.add('walking'); setMargoPosition(Math.max(0,Math.min(100,((cx-64)/sr.width)*100)), Math.max(0,Math.min(100,((cy-64)/sr.height)*100)));
+                    showMargoBubble(); setTimeout(()=>{if(!isMargoMoving)margo.classList.remove('walking');},650);
+                }
+            });
+            sampleDayImg.addEventListener('click', function(e) { e.stopPropagation(); if(isModalOpen||isMargoMoving||miniGameActive) return; if(currentDay===5&&!dayCompleted){startMiniGame(5);return;} if(currentDay===5&&daysCompleted[5]){openFinaleModal();return;} showSampleInfo(currentDay); });
+            function showSampleInfo(day){
+                const cfg=daysConfig[day];
+                const descriptions = {
+                    1: "Осколок астероида, доставленный в гермоконтейнере. На вид — обычный камень, но от него исходит слабое свечение.",
+                    2: "Клочок шерсти, найденный в Гималаях. Говорят, принадлежит самому йети. Выглядит как спутанный клок, но под микроскопом...",
+                    3: "Эктоплазма из старого особняка. Пульсирует и пахнет ванилью. Хранить в герметичной ёмкости!",
+                    4: "Артефакт со дна океана. Излучает магнитное поле. Кажется, это часть древнего якоря?",
+                    5: "Очень загадочный торт. Обнаружен на пороге лаборатории с запиской."
+                };
+                const desc = descriptions[day] || "Образец ожидает анализа. Требуется изучить.";
+                openModal(`📋 Образец дня ${cfg.num}: ${cfg.title}`,'',`<div style="text-align:left;"><p><strong>📦 ${cfg.title}</strong></p><p><em>Отправитель:</em> ${cfg.sender}</p><p><em>Цель анализа:</em> ${cfg.purpose}</p><p style="margin-top:0.8rem;">${desc}</p><button class="primary" id="btn-close-info" style="margin-top:1rem;">Понятно</button></div>`);
+                document.getElementById('btn-close-info').addEventListener('click', closeModal);
+            }
+            btnHint.addEventListener('click', ()=> openModal('❔ О лаборатории','',`<div style="text-align:left; font-size:0.9rem; line-height:1.5;"><p><strong>Лаборатория Регул-9</strong> — ведущий независимый центр анализа аномальных образцов на Марсе. Основана и управляется доктором Марго, известным ксенобиологом.</p><p>Мы принимаем заказы со всей Солнечной системы: от корпораций, научных обществ и частных лиц. Безупречная репутация делает нас одной из самых прибыльных лабораторий Красной планеты.</p><p><strong>Как играть:</strong><br>• Кликайте по полу, чтобы Марго ходила.<br>• Нажмите на образец на столе — узнаете отправителя и цель.<br>• Нужный прибор подсвечен стрелкой. Подойдите и кликните — откроется мини-игра.<br>• После успешного анализа данные уходят заказчику, вы получите отзыв и оплату.<br>• Завершённые образцы хранятся в холодильнике (клик по нему открывает архив).<br>• Компьютер открывает доступ к почте, браузеру, банковскому счёту, интернет-магазину и гардеробу.<br>• Кнопка «Следующий день» в углу станет активной после завершения анализа.</p><p style="margin-top:1rem;">Связь с разработчиком возможна по электронной почте: i.berezzkina@gmail.com</p></div>`));
+            btnStart.addEventListener('click', ()=>{ titleScreen.classList.add('hidden'); labScene.style.visibility='visible'; currentDay=1; dayCompleted=false; updateSampleOnTable(1); highlightDevice('cabinet'); showDayDialog(1); setMargoPosition(6,76); updateNextDayButton(); showMargoBubble(daysConfig[1].quote); restartBtn.classList.remove('visible'); updateMargoAppearance(); });
+            console.log('🔬 Лаборатория Регул-9 готова.');
+        })();
+    </script>
+</body>
+</html>
